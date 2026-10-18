@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tidelight</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,9 +47,46 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .keys{display:flex;gap:8px 20px;flex-wrap:wrap;justify-content:center;color:var(--ink-3);font-size:12px}
 kbd{font:600 11px/1 Manrope;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;margin-right:3px;border-radius:6px;border:1px solid var(--line);color:var(--ink-2)}
 
-#sound{position:fixed;top:14px;right:14px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink);opacity:.5;transition:opacity .4s}
-#sound:hover,#sound[aria-pressed="true"]{opacity:.95}
-#sound svg{width:22px;height:22px}
+[hidden]{display:none!important}
+/* round HUD buttons: sound top-right; pause and photo top-left while riding */
+.hud-btn{position:fixed;top:max(14px,env(safe-area-inset-top));width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink);opacity:.5;transition:opacity .3s,background .3s}
+.hud-btn:hover,#sound[aria-pressed="true"]{opacity:.95}
+.hud-btn svg{width:20px;height:20px}
+#sound{right:max(14px,env(safe-area-inset-right))}
+#pause{left:max(14px,env(safe-area-inset-left))}
+#shot{left:calc(max(14px,env(safe-area-inset-left)) + 54px)}
+/* touch controls: steering under the left thumb, speed under the right, like the arrow keys */
+#pad{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:flex-end;padding:0 max(18px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));
+  pointer-events:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#pad>div{display:flex;gap:14px;pointer-events:auto;touch-action:none}
+#pad .speed{flex-direction:column;margin-left:auto}
+#pad button{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;color:var(--ink);background:rgba(4,6,12,.34);border:1px solid var(--line);
+  transition:background .12s,border-color .12s,transform .25s var(--out)}
+#pad button.on{background:rgba(238,243,255,.18);border-color:var(--accent);transform:scale(.93)}
+#pad svg{width:26px;height:26px}
+/* volume sliders */
+.vol{-webkit-appearance:none;appearance:none;width:clamp(110px,24vw,150px);height:28px;margin:0;background:none;cursor:pointer;--p:70%}
+.vol::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent)) 0 0/var(--p) 100% no-repeat,var(--line)}
+.vol::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-7px;border-radius:50%;background:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.5);transition:transform .2s var(--out)}
+.vol:active::-webkit-slider-thumb{transform:scale(1.2)}
+.vol::-moz-range-track{height:2px;border-radius:2px;background:var(--line)}
+.vol::-moz-range-progress{height:2px;border-radius:2px;background:var(--accent)}
+.vol::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+@media (pointer:coarse){
+  .hud-btn{background:rgba(4,6,12,.34);border:1px solid var(--line);opacity:.75}   /* phones: visible over bright water */
+  .hud-btn:active,#sound[aria-pressed="true"]{opacity:1;background:rgba(4,6,12,.5)}
+  .swatches{gap:12px}
+  .swatch{width:34px;height:34px;position:relative}
+  .swatch::after{content:"";position:absolute;inset:-6px}                 /* 46px tap area */
+  .seg button,.seg-solo{min-height:44px;padding:0 16px;font-size:12px}
+  .vol{height:44px}
+  .vol::-webkit-slider-thumb{width:22px;height:22px;margin-top:-10px}
+  .vol::-moz-range-thumb{width:22px;height:22px}
+  .keys.kb{display:none}
+  #hint{bottom:196px}
+  #caption{bottom:max(13vh,210px)}
+}
+@media (pointer:fine){.keys.touch{display:none}}
 #hint{position:fixed;left:50%;bottom:20px;translate:-50% 0;color:var(--ink-3);font-size:12px;white-space:nowrap;transition:opacity 2s;pointer-events:none}
 #hint.gone{opacity:0}
 .options{display:flex;gap:16px 34px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--ink-3);animation:fade 1.6s .65s var(--out) both}
@@ -64,7 +101,6 @@ kbd{font:600 11px/1 Manrope;display:inline-grid;place-items:center;min-width:22p
 .seg-solo{border:1px solid var(--line);border-radius:999px}
 .seg button[aria-pressed="true"],.seg-solo[aria-pressed="true"]{background:rgba(238,243,255,.14);color:var(--ink)}
 #photoBar{position:fixed;left:50%;bottom:18px;translate:-50% 0;display:flex;gap:12px;align-items:center;padding:8px 8px 8px 18px;border-radius:999px;background:rgba(4,6,12,.62);border:1px solid var(--line);font-size:12px;color:var(--ink-2);white-space:nowrap}
-#photoBar[hidden]{display:none}
 #photoBar button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--ink);font:600 11px/1 Manrope;letter-spacing:.04em}
 #photoBar button:hover{background:rgba(238,243,255,.12)}
 body.photo #sound,body.photo #hint,body.photo #caption{display:none}
@@ -73,7 +109,13 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
 #dawn{position:fixed;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;transition:opacity 3s var(--out),filter 3s var(--out);background:radial-gradient(60% 50% at 50% 50%,rgba(0,0,0,.25),transparent)}
 #dawn h2{margin:0;font:300 italic clamp(64px,10vw,6rem)/1 "Cormorant Garamond",serif;text-shadow:0 4px 40px rgba(0,0,0,.4)}
 #dawn p{margin:14px 0 0;color:var(--ink-2);font-size:15px}
-@media (max-width:560px){.theme .desc{display:none}.theme .name{font-size:18px}.keys{gap:6px 14px}}
+@media (max-width:560px){.theme .desc{display:none}.theme .name{font-size:18px}.keys{gap:6px 14px}
+  .options{flex-direction:column;align-items:stretch;gap:12px;width:min(100%,330px)}
+  .opt{display:grid;grid-template-columns:74px 1fr;align-items:center;gap:12px}
+  .opt .vol{width:100%}
+  .opt .seg-solo{justify-self:start}
+  .swatches{gap:8px}}
+.keys.touch{margin:0;max-width:34ch;text-align:center;line-height:1.5}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -100,14 +142,23 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
     <div class="opt" role="group" aria-label="Graphics"><span class="opt-label">Graphics</span><span class="seg">
       <button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button>
     </span></div>
-    <button id="tilt" class="seg-solo" hidden>Tilt to steer</button>
+    <div class="opt"><label class="opt-label" for="vol-music">Music</label><input class="vol" id="vol-music" type="range" min="0" max="100" data-vol="music"></div>
+    <div class="opt"><label class="opt-label" for="vol-sfx">Sound</label><input class="vol" id="vol-sfx" type="range" min="0" max="100" data-vol="sfx"></div>
+    <div class="opt" id="tiltRow"><span class="opt-label">Steering</span><button id="tilt" class="seg-solo" aria-pressed="false">Tilt to steer</button></div>
   </div>
   <div class="start">
     <button id="ride">Start riding</button>
-    <div class="keys"><span><kbd>↑</kbd><kbd>↓</kbd>speed</span><span><kbd>←</kbd><kbd>→</kbd>steer</span><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>theme</span><span><kbd>P</kbd>photo</span><span><kbd>M</kbd>sound</span><span><kbd>Esc</kbd>menu</span></div>
+    <div class="keys kb"><span><kbd>↑</kbd><kbd>↓</kbd>speed</span><span><kbd>←</kbd><kbd>→</kbd>steer</span><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>theme</span><span><kbd>P</kbd>photo</span><span><kbd>M</kbd>sound</span><span><kbd>Esc</kbd>menu</span></div>
+    <p class="keys touch">Left buttons steer, right buttons set your speed. Pause brings you back here.</p>
   </div>
 </div>
-<button id="sound" aria-pressed="false" aria-label="Turn sound on"></button>
+<button id="sound" class="hud-btn" aria-pressed="false" aria-label="Turn sound on"></button>
+<button id="pause" class="hud-btn" aria-label="Pause and open the menu" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg></button>
+<button id="shot" class="hud-btn" aria-label="Photo mode" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.3"/></svg></button>
+<div id="pad" hidden>
+  <div class="steer"><button data-key="ArrowLeft" aria-label="Steer left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg></button><button data-key="ArrowRight" aria-label="Steer right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></button></div>
+  <div class="speed"><button data-key="ArrowUp" aria-label="Speed up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14.5 6-6 6 6"/></svg></button><button data-key="ArrowDown" aria-label="Slow down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg></button></div>
+</div>
 <p id="caption" class="gone" aria-live="polite"></p>
 <div id="photoBar" hidden><span>Drag to look around · Scroll to zoom</span><button id="photoSave">Save photo</button><button id="photoExit">Done</button></div>
 <div id="dawn" class="gone" aria-live="polite"><h2>Dawn</h2><p></p></div>
@@ -1223,6 +1274,7 @@ function applyMood(name){
 
 // ================= sound: ElevenLabs recordings in ./sounds (lofi beds, ambience, effects), plus a synth splash =================
 let audio = null, soundOn = false;
+const vol = { music:+(store('music') ?? 70), sfx:+(store('sfx') ?? 70) };   // slider 70 = the original mix; 100 is about +6 dB
 const LOOPS = ['ocean', 'wind', 'engine', 'wade', 'sand', ...Object.keys(MOODS).map(k => 'lofi-' + k)], SHOTS = ['throttle', 'decel', 'whale', 'dolphins', 'festival', 'star', 'gulls', 'foghorn'];
 function makeAudio(){
   const ac = new AudioContext();
@@ -1230,9 +1282,10 @@ function makeAudio(){
   const filt = (type, f, Q = 1) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = Q; return b; };
   const gain = v => { const g = ac.createGain(); g.gain.value = v; return g; };
   const out = gain(0); out.connect(ac.destination);
+  const music = gain(1), sfx = gain(1); music.connect(out); sfx.connect(out);   // the Music and Sound sliders
   const rev = ac.createConvolver(), len = ac.sampleRate*4.5, ir = ac.createBuffer(2, len, ac.sampleRate);
   for (let c = 0; c < 2; c++){ const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (R()*2 - 1)*Math.pow(1 - i/len, 3.2); }
-  rev.buffer = ir; chain(rev, gain(.5), out);
+  rev.buffer = ir; chain(rev, gain(.5), sfx);
   const nb = ac.createBuffer(1, ac.sampleRate*3, ac.sampleRate), nd = nb.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = R()*2 - 1;
   const buf = {}, loops = {};
@@ -1240,22 +1293,22 @@ function makeAudio(){
     fetch(`sounds/${name}.mp3`).then(r => r.ok ? r.arrayBuffer() : Promise.reject()).then(a => ac.decodeAudioData(a)).then(b => {
       buf[name] = b;
       if (!LOOPS.includes(name)) return;
-      const s = ac.createBufferSource(), g = gain(0); s.buffer = b; s.loop = true; chain(s, g, out); s.start(); loops[name] = { s, g };
+      const s = ac.createBufferSource(), g = gain(0); s.buffer = b; s.loop = true; chain(s, g, name.startsWith('lofi') ? music : sfx); s.start(); loops[name] = { s, g };
     }).catch(() => {});
   const play = (name, vol = 1, rate = 1, toRev = false) => {
     if (!buf[name]) return;
     const s = ac.createBufferSource(), g = gain(vol); s.buffer = buf[name]; s.playbackRate.value = rate;
-    chain(s, g, out); if (toRev) g.connect(rev); s.start();
+    chain(s, g, sfx); if (toRev) g.connect(rev); s.start();
   };
   const splashHit = v => {                                    // crack of spray + a low whump of water
     const t = ac.currentTime;
     [[filt('bandpass', 1300 + R()*900, .7), .42, .55], [filt('lowpass', 380 + R()*120), .5, .35]].forEach(([f, lv, len]) => {
       const s = ac.createBufferSource(), g = gain(0);
-      s.buffer = nb; s.playbackRate.value = .85 + R()*.3; chain(s, f, g, out); s.start(t, R()*2); s.stop(t + len + .1);
+      s.buffer = nb; s.playbackRate.value = .85 + R()*.3; chain(s, f, g, sfx); s.start(t, R()*2); s.stop(t + len + .1);
       g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lv*Math.min(v, 1.4), t + .015); g.gain.exponentialRampToValueAtTime(.001, t + len);
     });
   };
-  return { ac, out, splashHit, play, loops, thr:0, revAt:0 };
+  return { ac, out, music, sfx, splashHit, play, loops, thr:0, revAt:0 };
 }
 function updateAudio(st){
   if (!audio || !soundOn) return;
@@ -1273,10 +1326,14 @@ function updateAudio(st){
   }
   audio.thr = st.thr;
 }
+function applyVol(){
+  document.querySelectorAll('[data-vol]').forEach(el => { el.value = vol[el.dataset.vol]; el.style.setProperty('--p', el.value + '%'); });
+  if (audio) for (const k in vol) audio[k].gain.setTargetAtTime((vol[k]/70)**2, audio.ac.currentTime, .05);
+}
 const soundBtn = document.getElementById('sound');
 function setSound(on){
   soundOn = on;
-  if (on && !audio) audio = makeAudio();
+  if (on && !audio){ audio = makeAudio(); applyVol(); }
   if (audio){ if (on) audio.ac.resume(); audio.out.gain.setTargetAtTime(on ? .9 : 0, audio.ac.currentTime, .6); }
   soundBtn.setAttribute('aria-pressed', String(on));
   soundBtn.setAttribute('aria-label', on ? 'Turn sound off' : 'Turn sound on');
@@ -1286,7 +1343,7 @@ soundBtn.addEventListener('click', () => setSound(!soundOn));
 
 // ================= riding =================
 const keys = {};
-let frameNo = 0, tripM = 0, splashCool = 0, touchSteer = 0, playing = false, gameT = 40, dashKmh = -1, dashAt = 0, wet = .15, wetAge = 0, nextShoot = 6, shootT = -1, wasInWater = false;
+let frameNo = 0, tripM = 0, splashCool = 0, playing = false, gameT = 40, dashKmh = -1, dashAt = 0, wet = .15, wetAge = 0, nextShoot = 6, shootT = -1, wasInWater = false;
 const START_Z = +(q.get('z') ?? 0);
 const bike = (() => { const [x, z] = roadPt(START_Z, 1); return { x, z, yaw:Math.atan(roadDX(START_Z)), v:12, steer:0, gy:sandH(1, x, z, START_Z), pitch:0, lean:0 }; })();
 
@@ -1299,8 +1356,8 @@ function step(dt){
     thr = clamp((13 - b.v)*.3, -1, 1);
   } else {
     const pad = padState();
-    steerIn = clamp((keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0) + touchSteer + pad.steer + (tiltOn ? clamp(-tilt/22, -1, 1) : 0), -1, 1);
-    thr = clamp((keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0) + pad.thr + (tiltOn && touching ? 1 : 0), -1, 1);
+    steerIn = clamp((keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0) + pad.steer + (tiltOn ? clamp(-tilt/22, -1, 1) : 0), -1, 1);
+    thr = clamp((keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0) + pad.thr, -1, 1);
   }
   b.v += (thr > 0 ? thr*(2.5 + 8*(1 - b.v/VMAX)) : thr*14)*dt;
 
@@ -1415,7 +1472,22 @@ function frame(now){
 // ================= menu + input =================
 const menu = document.getElementById('menu'), hint = document.getElementById('hint'), rideBtn = document.getElementById('ride');
 const photoBar = document.getElementById('photoBar');
-let hintTimer, touching = false, tiltOn = false, tilt = 0, padPrev = [];
+let hintTimer, tiltOn = false, tilt = 0, padPrev = [];
+const touchPad = document.getElementById('pad'), steerGrp = touchPad.querySelector('.steer'), pauseBtn = document.getElementById('pause'), shotBtn = document.getElementById('shot');
+const held = new Map();                                              // pointer -> the key it holds, so a thumb can slide between buttons
+const syncPad = () => touchPad.querySelectorAll('[data-key]').forEach(b => { const on = [...held.values()].includes(b.dataset.key); keys[b.dataset.key] = on; b.classList.toggle('on', on); });
+const hold = e => { const b = document.elementFromPoint(e.clientX, e.clientY)?.closest('#pad [data-key]'); b ? held.set(e.pointerId, b.dataset.key) : held.delete(e.pointerId); syncPad(); };
+for (const grp of touchPad.children){
+  grp.addEventListener('pointerdown', e => { e.preventDefault(); hold(e); });
+  grp.addEventListener('pointermove', e => { if (e.buttons) hold(e); });
+  for (const ev of ['pointerup', 'pointercancel']) grp.addEventListener(ev, e => { held.delete(e.pointerId); syncPad(); });
+}
+touchPad.addEventListener('contextmenu', e => e.preventDefault());
+function hud(){
+  touchPad.hidden = !(MOBILE && playing && !photo); steerGrp.hidden = tiltOn;
+  pauseBtn.hidden = shotBtn.hidden = !MOBILE || !playing || photo;
+  if (touchPad.hidden){ held.clear(); syncPad(); }
+}
 function setPlaying(on){
   playing = on;
   if (!on) setPhoto(false);
@@ -1424,11 +1496,13 @@ function setPlaying(on){
   clearTimeout(hintTimer);
   hint.classList.toggle('gone', !on);
   if (on) hintTimer = setTimeout(() => hint.classList.add('gone'), 7000);
+  hud();
 }
 function setPhoto(on){
   photo = on && playing;
   photoBar.hidden = !photo; document.body.classList.toggle('photo', photo);
   if (photo){ look.yaw = bike.yaw; look.pitch = -.05; look.fov = 62; }
+  hud();
 }
 function savePhoto(){
   frame(performance.now());
@@ -1452,6 +1526,14 @@ document.querySelectorAll('[data-paint]').forEach(btn => btn.addEventListener('c
 document.querySelectorAll('[data-q]').forEach(btn => btn.addEventListener('click', () => applyQuality(btn.dataset.q)));
 document.getElementById('photoSave').addEventListener('click', savePhoto);
 document.getElementById('photoExit').addEventListener('click', () => setPhoto(false));
+pauseBtn.addEventListener('click', () => setPlaying(false));
+shotBtn.addEventListener('click', () => setPhoto(true));
+document.querySelectorAll('[data-vol]').forEach(el => el.addEventListener('input', () => {
+  vol[el.dataset.vol] = +el.value; store(el.dataset.vol, el.value);
+  if (!soundOn) setSound(true);                                      // reaching for a slider means they want to hear it
+  applyVol();
+}));
+if (MOBILE){ hint.textContent = 'Steer on the left · set your speed on the right'; photoBar.firstElementChild.textContent = 'Drag to look around'; }
 addEventListener('keydown', e => {
   if (e.code.startsWith('Arrow')) e.preventDefault();
   keys[e.code] = true;
@@ -1465,36 +1547,33 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-// touch: left/right thirds steer; with tilt steering, hold anywhere to accelerate. In photo mode, drag looks around.
+// photo mode: drag looks around, the wheel zooms
 let drag = null;
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (photo){ drag = { x:e.clientX, y:e.clientY }; renderer.domElement.setPointerCapture(e.pointerId); return; }
-  if (!playing) return;
-  touching = true;
-  if (!tiltOn) touchSteer = e.clientX < innerWidth/3 ? 1 : e.clientX > innerWidth*2/3 ? -1 : 0;
+  if (photo){ drag = { x:e.clientX, y:e.clientY }; renderer.domElement.setPointerCapture(e.pointerId); }
 });
 renderer.domElement.addEventListener('pointermove', e => {
   if (!photo || !drag) return;
   look.yaw += (e.clientX - drag.x)*.004; look.pitch = clamp(look.pitch + (e.clientY - drag.y)*.004, -1.2, 1.2);
   drag = { x:e.clientX, y:e.clientY };
 });
-addEventListener('pointerup', () => { touchSteer = 0; touching = false; drag = null; });
+addEventListener('pointerup', () => { drag = null; });
 renderer.domElement.addEventListener('wheel', e => { if (photo){ e.preventDefault(); look.fov = clamp(look.fov*Math.exp(e.deltaY*.001), 20, 90); } }, { passive:false });
 const tiltBtn = document.getElementById('tilt');
-tiltBtn.hidden = !MOBILE;
+document.getElementById('tiltRow').hidden = !MOBILE;
 tiltBtn.addEventListener('click', async () => {
   if (!tiltOn && typeof DeviceOrientationEvent?.requestPermission === 'function'){ try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return; } catch { return; } }
-  tiltOn = !tiltOn; tiltBtn.setAttribute('aria-pressed', String(tiltOn));
+  tiltOn = !tiltOn; tiltBtn.setAttribute('aria-pressed', String(tiltOn)); hud();
 });
 addEventListener('deviceorientation', e => { tilt = e.gamma || 0; });
 
 applyMood(moodName);
 applyPaint(store('paint') || 'rosso');
 applyQuality(store('quality') || (MOBILE ? 'med' : 'high'));
-setSound(false);
+setSound(false); applyVol();
 setPlaying(STILL);
 if (STILL){ menu.style.display = 'none'; soundBtn.style.display = 'none'; }
-const fpsEl = q.has('fps') ? document.body.appendChild(Object.assign(document.createElement('div'), { style:'position:fixed;left:8px;top:8px;font:12px monospace;color:#9f9;z-index:9' })) : null;
+const fpsEl = q.has('fps') ? document.body.appendChild(Object.assign(document.createElement('div'), { style:'position:fixed;left:50%;translate:-50% 0;top:8px;font:12px monospace;color:#9f9;z-index:9' })) : null;
 let perf = { n:0, ms:0, cpu:0 };
 renderer.setAnimationLoop(now => {
   const gap = now - (frame.last ?? now);
