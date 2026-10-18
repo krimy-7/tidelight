@@ -965,9 +965,16 @@ for (const sx of [-1, 1]){
   mir.lookAt(0, 0, 0); mir.rotateY(sx*.25);
 }
 const dashLight = new THREE.PointLight(0xffffff, .05, 1, 2); dashLight.position.set(0, -.24, -.76); bikeG.add(dashLight);
-// fuel tank between the rider's arms: only in view on tall (portrait) screens, where the field of view opens up
-add(bikeG, new THREE.SphereGeometry(1, 48, 24), mat.paintFront, 0, -.66, -.42).scale.set(.21, .14, .32);
-add(bikeG, new THREE.CylinderGeometry(.045, .045, .012, 32), mat.aluBlk, 0, -.522, -.5);                        // filler cap
+// below the bars, in view on tall screens and at speed: a shaped tank, the lower fairing, and the frame beams beside the tank
+const loft = (st, around = 40) => new ParametricGeometry((u, v, p) => {   // stations: [z, centre y, half width, half height], superellipse sections
+  const f = v*(st.length - 1), i = Math.min(Math.floor(f), st.length - 2), t = f - i, k = t*t*(3 - 2*t), A = st[i], B = st[i + 1];
+  const a = u*Math.PI*2, c = Math.cos(a), sn = Math.sin(a), e = .62;
+  p.set((A[2] + (B[2] - A[2])*k)*Math.sign(c)*Math.abs(c)**e, A[1] + (B[1] - A[1])*k + (A[3] + (B[3] - A[3])*k)*Math.sign(sn)*Math.abs(sn)**e, A[0] + (B[0] - A[0])*t);
+}, around, st.length*8);
+add(bikeG, loft([[-.82, -.56, .05, .03], [-.74, -.58, .17, .09], [-.56, -.62, .22, .12], [-.32, -.66, .21, .11], [-.12, -.7, .15, .08], [-.03, -.71, .05, .03]]), mat.paintFront);   // tank
+add(bikeG, new THREE.CylinderGeometry(.045, .045, .012, 32), mat.aluBlk, 0, -.494, -.62);                       // filler cap
+add(bikeG, loft([[-1.18, -.74, .05, .05], [-1.02, -.76, .22, .16], [-.78, -.82, .3, .22], [-.46, -.86, .29, .22], [-.2, -.88, .22, .18], [-.08, -.88, .06, .05]]), mat.paintFront);   // lower fairing
+for (const sx of [-1, 1]) tube(bikeG, [[sx*.12, -.54, -.86], [sx*.25, -.6, -.58], [sx*.24, -.66, -.26]], .028, mat.alu);   // frame beams
 bake(bikeG, [bars]); bake(bars);
 camera.add(bikeG);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, .35); scene.add(hemi);
@@ -1418,11 +1425,15 @@ function step(dt){
     emitSplash(Math.floor(inten*1600*dt + R()), b.x + fx*1.2, sy, b.z + fz*1.2, fx, fz, b.v, inten);
     if (wet < .35 && inten > .3){ lens.uniforms.uSeed.value = R()*100; wetAge = 0; }
     wet = Math.min(1, wet + inten*dt*1.4);
-    if ((!wasInWater || inten > wasInWater*1.8) && inten > .2 && gameT > splashCool){ audio?.splashHit(inten); splashCool = gameT + .16; }
   }
-  wasInWater = inten;
+  // phone speakers and Bluetooth play late, so the ear listens for water that far ahead of the bike: the splash lands with the spray
+  const lat = audio ? (audio.ac.baseLatency || 0) + (audio.ac.outputLatency || .1) : 0, ax = b.x + fx*b.v*lat, az = b.z + fz*b.v*lat, fa = roadFrame(ax, az);
+  const ga = sandH(fa.u, ax, az, fa.zc), da = Math.max(waterLevel(fa.u, fa.zc, gameT + lat) - ga, Math.abs(fa.u) > 5.9 ? -ga : 0, 0);
+  const heard = da > .012 && b.v > 1.5 ? Math.min(da*25, 1)*Math.min(b.v/14, 2.2) : 0;
+  if ((!wasInWater || heard > wasInWater*1.8) && heard > .2 && gameT > splashCool){ audio?.splashHit(heard); splashCool = gameT + .16; }
+  wasInWater = heard;
   wet = Math.max(.15, wet - dt*.1); wetAge += dt;
-  return { v:b.v, splash:inten, zc:f2.zc, thr };
+  return { v:b.v, splash:heard, zc:f2.zc, thr };
 }
 
 let photo = false;
