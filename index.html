@@ -1398,9 +1398,9 @@ function frame(now){
   if (cockpit && (kmh !== dashKmh || now - dashAt > 1000) && now - dashAt > 200){ drawDash(kmh); dashKmh = kmh; dashAt = now; }
   updateAudio(st);
   if (cockpit){                                                      // refresh reflections and mirrors without the bike in them
-    const q2 = QUALITY[quality], face = frameNo % q2.env;
+    const q2 = QUALITY[quality], face = frameNo % (q2.env*(MOBILE ? 2 : 1));
     bikeG.visible = false;
-    if (frameNo % q2.rear === 0){ renderer.setRenderTarget(rearRT); renderer.render(scene, rearCam); }
+    if (frameNo % (q2.rear + (MOBILE ? 1 : 0)) === 0){ renderer.setRenderTarget(rearRT); renderer.render(scene, rearCam); }
     if (face < 6){                                                   // one cube face per frame: no spike
       if (!face){ envCam.position.copy(camera.position); envCam.updateMatrixWorld(); }
       renderer.setRenderTarget(bikeEnvRT, face); renderer.render(scene, envCam.children[face]);
@@ -1495,17 +1495,17 @@ setSound(false);
 setPlaying(STILL);
 if (STILL){ menu.style.display = 'none'; soundBtn.style.display = 'none'; }
 const fpsEl = q.has('fps') ? document.body.appendChild(Object.assign(document.createElement('div'), { style:'position:fixed;left:8px;top:8px;font:12px monospace;color:#9f9;z-index:9' })) : null;
-let perf = { n:0, ms:0 };
+let perf = { n:0, ms:0, cpu:0 };
 renderer.setAnimationLoop(now => {
   const gap = now - (frame.last ?? now);
   if (MOBILE && gap > 0 && gap < 10) return;                       // 120 Hz phones: every other frame (60 fps); 60/90 Hz run as is
-  if (gap > 0 && gap < 100 && !STILL && (perf.ms += gap, ++perf.n === 60)){   // dynamic resolution: drop it when frames run long, win it back when they don't
-    const ms = perf.ms/60, cur = renderer.getPixelRatio(), next = clamp(ms > 19 ? cur*.85 : ms < 17.5 ? cur*1.1 : cur, .5, Math.min(devicePixelRatio, QUALITY[quality].pr));
+  if (gap > 0 && gap < 100 && !STILL && (perf.ms += gap, ++perf.n === 60)){   // dynamic resolution, kept within 75-100% of the chosen setting so it never turns to mush
+    const ms = perf.ms/60, cur = renderer.getPixelRatio(), max = Math.min(devicePixelRatio, QUALITY[quality].pr), next = clamp(ms > 19 ? cur*.9 : ms < 17.5 ? cur*1.1 : cur, max*.75, max);
     if (Math.abs(next - cur) > .02){ renderer.setPixelRatio(next); composer.setPixelRatio(next); resize(); }
-    if (fpsEl) fpsEl.textContent = `${Math.round(1000/ms)} fps · ${next.toFixed(2)}x · ${quality}`;
-    perf = { n:0, ms:0 };
+    if (fpsEl) fpsEl.textContent = `${Math.round(1000/ms)} fps · cpu ${(perf.cpu/60).toFixed(1)} ms · ${next.toFixed(2)}x · ${quality}`;
+    perf = { n:0, ms:0, cpu:0 };
   }
-  frame(now);
+  const t0 = performance.now(); frame(now); perf.cpu += performance.now() - t0;
 });
 window.snap = (n = 1) => { const t0 = performance.now(); for (let i = 1; i <= n; i++) frame(t0 + i*1000/60); return new Promise(r => renderer.domElement.toBlob(r, 'image/png')); };   // capture hook
 </script>
