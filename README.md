@@ -30,4 +30,4 @@ A gamepad works (stick to steer, triggers for speed). On phones, tap the left or
 ## Built with
 
 - [three.js](https://threejs.org) 0.160, loaded from a CDN
-- Sound effects generated with [ElevenLabs](https://elevenlabs.io); the music pad and chimes are synthesized in the browser
+- Lofi music (one loop per theme) and sound effects generated with [ElevenLabs](https://elevenlabs.io); the splash is synthesized in the browser
