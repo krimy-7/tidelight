@@ -122,6 +122,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ================= themes =================
 const MOODS = {
@@ -131,7 +132,8 @@ const MOODS = {
 };
 const q = new URLSearchParams(location.search);
 const store = (k, v) => { try { return v === undefined ? localStorage.getItem('tidelight-' + k) : localStorage.setItem('tidelight-' + k, v); } catch { return null; } };
-const STILL = q.has('still');          // fixed 1920x1080 canvas for captures, skips the menu
+const STILL = q.has('still');
+const MOBILE = matchMedia('(pointer: coarse)').matches;          // fixed 1920x1080 canvas for captures, skips the menu
 
 // ================= road + terrain (JS twin of the GLSL below: keep both in sync) =================
 const ROAD_Y = .32;
@@ -201,12 +203,12 @@ const U = {
   uMoonSize:{value:0}, uPhase:{value:0}, uMilkyAmt:{value:1}, uAurora:{value:0}, uBio:{value:0},
   uHeadPos:{value:new THREE.Vector3()}, uHeadDir:{value:new THREE.Vector3()},
   uShootA:{value:new THREE.Vector3()}, uShootB:{value:new THREE.Vector3()}, uShootP:{value:-1},
-  uSunDir:{value:new THREE.Vector3(0, -1, 0)}, uSun:{value:0}, uDawn:{value:0}, uFest:{value:0}, uFestT:{value:0}, uFestZ:{value:0},
+  uSunDir:{value:new THREE.Vector3(0, -1, 0)}, uSun:{value:0}, uDawn:{value:0}, uLite:{value:0}, uFest:{value:0}, uFestT:{value:0}, uFestZ:{value:0},
 };
 
 // ================= shared GLSL =================
 const COMMON = /* glsl */`
-uniform float uTime, uMoonSize, uPhase, uMilkyAmt, uAurora, uBio, uShootP, uSun, uDawn;
+uniform float uTime, uMoonSize, uPhase, uMilkyAmt, uAurora, uBio, uShootP, uSun, uDawn, uLite;
 uniform vec3 uMoonDir, uMilkyN, uGalC, uSkyTop, uSkyHor, uHorGlow, uMoonCol, uMilky, uWater, uFoam, uHeadCol, uHeadPos, uHeadDir, uShootA, uShootB, uSunDir;
 #define ROAD_Y .32
 float gs(float x){ return exp(-x*x); }
@@ -305,8 +307,9 @@ vec3 moonDisc(vec3 d, out float disc){
 }
 vec3 sky(vec3 d, float withStars){
   vec3 col=haze(d);
-  float band; col+=milky(d,band)*smoothstep(-.02,.1,d.y)*(1.-uDawn*.95);
-  if(uAurora>0.) col+=aurora(d)*uAurora*(1.-uDawn);
+  float band=0.; bool full=withStars>0. || uLite<.5;              // reflections skip the galaxy and aurora below High
+  if(full) col+=milky(d,band)*smoothstep(-.02,.1,d.y)*(1.-uDawn*.95);
+  if(uAurora>0. && full) col+=aurora(d)*uAurora*(1.-uDawn);
   float disc; vec3 mc=moonDisc(d,disc);
   if(withStars>0.){
     vec3 s=starLayer(d,110.,0.)+starLayer(d,230.,7.)*(.12+.5*band)+starLayer(d,430.,13.)*.8*band;
@@ -389,7 +392,8 @@ const ocean = new THREE.Mesh(radialGrid(), new THREE.ShaderMaterial({ uniforms:U
     vec3 V=cameraPosition-vW; float dist=length(V); V/=dist;
     vec2 p=vW.xz;
     float e=.03+dist*.004, amp=shoreAmp(vD);
-    float h0=waveH(p,20), hx=waveH(p+vec2(e,0.),20), hz=waveH(p+vec2(0.,e),20);
+    int oc=int(mix(20.,7.,smoothstep(40.,700.,dist)));             // fine ripples only up close
+    float h0=waveH(p,oc), hx=waveH(p+vec2(e,0.),oc), hz=waveH(p+vec2(0.,e),oc);
     vec3 n=normalize(vec3(-(hx-h0)/e*amp, 1., -(hz-h0)/e*amp));
     n=normalize(mix(n, vec3(0,1,0), smoothstep(300.,2500.,dist)*.6));
     vec3 R=reflect(-V,n); R.y=abs(R.y);
@@ -757,6 +761,7 @@ const fritTex = canvasTex(4, 256, (g, w, h) => {                  // smoked scre
 });
 fritTex.wrapS = fritTex.wrapT = THREE.ClampToEdgeWrapping;
 
+envCam.update(renderer, scene);                                   // sets up the six face cameras
 const bikeEnvPM = pmrem.fromCubemap(bikeEnvRT.texture);          // prefiltered here, never mid-render
 const ENV = { envMap:bikeEnvPM.texture };
 const phys = o => new THREE.MeshPhysicalMaterial({ ...ENV, ...o });
@@ -783,6 +788,23 @@ const V3 = q => new THREE.Vector3(...q);
 const add = (parent, geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); parent.add(o); return o; };
 const tubeGeo = (pts, r, seg = 12) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(V3)), 32, r, seg);
 const tube = (parent, pts, r, m) => add(parent, tubeGeo(pts, r), m);
+// merge every static mesh under root into one mesh per material (phones pay per draw call); `skip` subtrees stay live
+function bake(root, skip = []){
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert(), byMat = new Map(), found = [];
+  root.traverse(o => { if (!o.isMesh) return; for (let a = o.parent; a && a !== root; a = a.parent) if (skip.includes(a)) return; found.push(o); });
+  for (const o of found){
+    const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(m);
+    for (const k in g.attributes) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (m.determinant() < 0) for (const a of Object.values(g.attributes)) for (let i = 0; i < a.count; i += 3)   // mirrored parts: keep triangles facing out
+      for (let c = 0; c < a.itemSize; c++){ const j = (i + 1)*a.itemSize + c, k = (i + 2)*a.itemSize + c, t = a.array[j]; a.array[j] = a.array[k]; a.array[k] = t; }
+    const e = byMat.get(o.material) ?? byMat.set(o.material, { geos:[], order:0 }).get(o.material);
+    e.geos.push(g); e.order = Math.max(e.order, o.renderOrder);
+    o.removeFromParent();
+  }
+  for (const [mat, { geos, order }] of byMat) add(root, mergeGeometries(geos), mat).renderOrder = order;
+  return root;
+}
 
 // upper fairing: phi wraps around (0 = top), t runs nose (0) -> rider (1); the top band is the screen.
 // Outside: metallic red with flake under clearcoat. Inside: carbon, with a painted rim along the screen.
@@ -871,6 +893,7 @@ for (const sx of [-1, 1]){
   mir.lookAt(0, 0, 0); mir.rotateY(sx*.25);
 }
 const dashLight = new THREE.PointLight(0xffffff, .05, 1, 2); dashLight.position.set(0, -.24, -.76); bikeG.add(dashLight);
+bake(bikeG, [bars]); bake(bars);
 camera.add(bikeG);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, .35); scene.add(hemi);
 const moonLight = new THREE.DirectionalLight(0xffffff, 1.4); moonLight.position.copy(U.uMoonDir.value).multiplyScalar(100); scene.add(moonLight, moonLight.target);
@@ -921,7 +944,7 @@ function lighthouse(){
   const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowSprite, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, fog:false }));
   flare.position.y = 24.4; g.add(flare);
   g.userData = { beam, flare };
-  return g;
+  return bake(g, [beam]);
 }
 function shipwreck(){
   const g = new THREE.Group(), tilt = new THREE.Group(); g.add(tilt);
@@ -937,14 +960,14 @@ function shipwreck(){
   add(tilt, new THREE.CylinderGeometry(.16, .24, 11, 10), wood, 2, 5, 0).rotation.z = .5;   // broken mast
   add(tilt, new THREE.CylinderGeometry(.09, .09, 5, 8), wood, .4, 7.4, 0).rotation.x = Math.PI/2;
   tilt.rotation.set(.34, 0, .16);
-  return g;
+  return bake(g);
 }
 function seaArch(){
   const g = new THREE.Group();
   const pts = [[-15, -4, 0], [-12.5, 4, .5], [-8, 9.5, 1.2], [-2, 12, .3], [4, 11.4, -.8], [9.5, 8, -.6], [13, 2, .4], [15, -4, 0]];
   add(g, rockify(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(V3)), 160, 2.8, 20, false), 1.1, .3), rockMat);
   for (const sx of [-1, 1]) for (let i = 0; i < 4; i++){ const r = 1.6 + R()*2.2; add(g, rockify(new THREE.IcosahedronGeometry(r, 2), r*.25, .4, true), rockMat, sx*(14 + R()*4), -.8, (R() - .5)*6).scale.y = .6; }
-  return g;
+  return bake(g);
 }
 const frondTex = canvasTex(256, 64, (c, w, h) => {
   c.strokeStyle = '#2c4a2a'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, h/2); c.lineTo(w, h/2); c.stroke(); c.lineWidth = 2.2;
@@ -966,7 +989,7 @@ function palmIslet(){
       const fr = add(g, fg, frondMat, ...trunk[8]); fr.rotation.y = k/9*Math.PI*2 + R()*.3; fr.rotation.z = .15 + R()*.2;
     }
   }
-  return g;
+  return bake(g);
 }
 const LM_GAP = 650, lmPools = [lighthouse, shipwreck, seaArch, palmIslet].map(f => [f(), f()]);
 lmPools.flat().forEach(o => { o.visible = false; scene.add(o); });
@@ -1129,10 +1152,10 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), .7, .55, .85);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const lens = new ShaderPass({
-  uniforms:{ tDiffuse:{value:null}, uRes:{value:new THREE.Vector2(W(), H())}, uTime:{value:0}, uWet:{value:.15}, uSeed:{value:0}, uAge:{value:0}, uSpeed:{value:0} },
+  uniforms:{ tDiffuse:{value:null}, uRes:{value:new THREE.Vector2(W(), H())}, uTime:{value:0}, uWet:{value:.15}, uSeed:{value:0}, uAge:{value:0}, uSpeed:{value:0}, uTaps:{value:6} },
   vertexShader:QUAD,
   fragmentShader:`
-  uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime, uWet, uSeed, uAge, uSpeed; varying vec2 vUv;
+  uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime, uWet, uSeed, uAge, uSpeed; uniform int uTaps; varying vec2 vUv;
   float h1(float n){ return fract(sin(n*91.3458)*47453.5453); }
   float h12(vec2 p){ vec3 q=fract(p.xyx*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
   void main(){
@@ -1157,12 +1180,13 @@ const lens = new ShaderPass({
     vec2 o=uv-.5; float r2=dot(o,o);
     vec3 col=vec3(0);
     for(int i=0;i<6;i++){
+      if(i>=uTaps) break;
       float s=1.-float(i)*(.005+.03*uSpeed*uSpeed)*r2;
       col.r+=texture2D(tDiffuse,.5+o*s*(1.+.012*r2)).r;
       col.g+=texture2D(tDiffuse,.5+o*s).g;
       col.b+=texture2D(tDiffuse,.5+o*s*(1.-.012*r2)).b;
     }
-    col=col/6.*(1.-shade)+spec;
+    col=col/float(uTaps)*(1.-shade)+spec;
     col*=mix(.3,1.,1.-smoothstep(.3,1.15,length((vUv-.5)*asp)));
     col+=(h12(vUv*uRes+fract(uTime)*397.)-.5)*.035;
     gl_FragColor=vec4(col,1.);
@@ -1322,13 +1346,14 @@ function step(dt){
 
 let photo = false;
 const look = { yaw:0, pitch:0, fov:62 };
-const QUALITY = { low:{ pr:.75, bloom:false, env:24, rear:4 }, med:{ pr:1, bloom:true, env:12, rear:3 }, high:{ pr:1.5, bloom:true, env:6, rear:2 } };
+const QUALITY = { low:{ pr:.75, bloom:false, env:24, rear:6, msaa:0, taps:3, lite:1 }, med:{ pr:1, bloom:true, env:12, rear:4, msaa:2, taps:4, lite:1 }, high:{ pr:1.5, bloom:true, env:6, rear:2, msaa:4, taps:6, lite:0 } };
 let quality = 'high';
 function applyQuality(name){
   quality = QUALITY[name] ? name : 'high';
   const qq = QUALITY[quality];
   renderer.setPixelRatio(STILL ? 1 : Math.min(devicePixelRatio, qq.pr)); composer.setPixelRatio(renderer.getPixelRatio());
-  bloom.enabled = qq.bloom;
+  bloom.enabled = qq.bloom; U.uLite.value = qq.lite; lens.uniforms.uTaps.value = qq.taps;
+  for (const rt of [composer.renderTarget1, composer.renderTarget2]){ rt.samples = qq.msaa; rt.dispose(); }
   resize();
   document.querySelectorAll('[data-q]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === quality)));
   store('quality', quality);
@@ -1370,13 +1395,17 @@ function frame(now){
 
   lens.uniforms.uTime.value = gameT; lens.uniforms.uWet.value = cockpit ? wet : 0; lens.uniforms.uAge.value = wetAge; lens.uniforms.uSpeed.value = photo ? 0 : b.v/VMAX;
   const kmh = Math.round(b.v*3.6);
-  if (cockpit && (kmh !== dashKmh || now - dashAt > 1000) && now - dashAt > 90){ drawDash(kmh); dashKmh = kmh; dashAt = now; }
+  if (cockpit && (kmh !== dashKmh || now - dashAt > 1000) && now - dashAt > 200){ drawDash(kmh); dashKmh = kmh; dashAt = now; }
   updateAudio(st);
   if (cockpit){                                                      // refresh reflections and mirrors without the bike in them
-    const q2 = QUALITY[quality];
+    const q2 = QUALITY[quality], face = frameNo % q2.env;
     bikeG.visible = false;
     if (frameNo % q2.rear === 0){ renderer.setRenderTarget(rearRT); renderer.render(scene, rearCam); }
-    if (frameNo % q2.env === 0){ envCam.position.copy(camera.position); envCam.update(renderer, scene); pmrem.fromCubemap(bikeEnvRT.texture, bikeEnvPM); }
+    if (face < 6){                                                   // one cube face per frame: no spike
+      if (!face){ envCam.position.copy(camera.position); envCam.updateMatrixWorld(); }
+      renderer.setRenderTarget(bikeEnvRT, face); renderer.render(scene, envCam.children[face]);
+      if (face === 5) pmrem.fromCubemap(bikeEnvRT.texture, bikeEnvPM);
+    }
     renderer.setRenderTarget(null); bikeG.visible = true;
   }
   frameNo++;
@@ -1452,7 +1481,7 @@ renderer.domElement.addEventListener('pointermove', e => {
 addEventListener('pointerup', () => { touchSteer = 0; touching = false; drag = null; });
 renderer.domElement.addEventListener('wheel', e => { if (photo){ e.preventDefault(); look.fov = clamp(look.fov*Math.exp(e.deltaY*.001), 20, 90); } }, { passive:false });
 const tiltBtn = document.getElementById('tilt');
-tiltBtn.hidden = !matchMedia('(pointer: coarse)').matches;
+tiltBtn.hidden = !MOBILE;
 tiltBtn.addEventListener('click', async () => {
   if (!tiltOn && typeof DeviceOrientationEvent?.requestPermission === 'function'){ try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return; } catch { return; } }
   tiltOn = !tiltOn; tiltBtn.setAttribute('aria-pressed', String(tiltOn));
@@ -1461,11 +1490,23 @@ addEventListener('deviceorientation', e => { tilt = e.gamma || 0; });
 
 applyMood(moodName);
 applyPaint(store('paint') || 'rosso');
-applyQuality(store('quality') || (matchMedia('(pointer: coarse)').matches ? 'med' : 'high'));
+applyQuality(store('quality') || (MOBILE ? 'med' : 'high'));
 setSound(false);
 setPlaying(STILL);
 if (STILL){ menu.style.display = 'none'; soundBtn.style.display = 'none'; }
-renderer.setAnimationLoop(frame);
+const fpsEl = q.has('fps') ? document.body.appendChild(Object.assign(document.createElement('div'), { style:'position:fixed;left:8px;top:8px;font:12px monospace;color:#9f9;z-index:9' })) : null;
+let perf = { n:0, ms:0 };
+renderer.setAnimationLoop(now => {
+  const gap = now - (frame.last ?? now);
+  if (MOBILE && gap > 0 && gap < 10) return;                       // 120 Hz phones: every other frame (60 fps); 60/90 Hz run as is
+  if (gap > 0 && gap < 100 && !STILL && (perf.ms += gap, ++perf.n === 60)){   // dynamic resolution: drop it when frames run long, win it back when they don't
+    const ms = perf.ms/60, cur = renderer.getPixelRatio(), next = clamp(ms > 19 ? cur*.85 : ms < 17.5 ? cur*1.1 : cur, .5, Math.min(devicePixelRatio, QUALITY[quality].pr));
+    if (Math.abs(next - cur) > .02){ renderer.setPixelRatio(next); composer.setPixelRatio(next); resize(); }
+    if (fpsEl) fpsEl.textContent = `${Math.round(1000/ms)} fps · ${next.toFixed(2)}x · ${quality}`;
+    perf = { n:0, ms:0 };
+  }
+  frame(now);
+});
 window.snap = (n = 1) => { const t0 = performance.now(); for (let i = 1; i <= n; i++) frame(t0 + i*1000/60); return new Promise(r => renderer.domElement.toBlob(r, 'image/png')); };   // capture hook
 </script>
 </body>
