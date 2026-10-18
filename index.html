@@ -72,21 +72,6 @@ kbd{font:600 11px/1 Manrope;display:inline-grid;place-items:center;min-width:22p
 .vol::-moz-range-track{height:2px;border-radius:2px;background:var(--line)}
 .vol::-moz-range-progress{height:2px;border-radius:2px;background:var(--accent)}
 .vol::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.5)}
-@media (pointer:coarse){
-  .hud-btn{background:rgba(4,6,12,.34);border:1px solid var(--line);opacity:.75}   /* phones: visible over bright water */
-  .hud-btn:active,#sound[aria-pressed="true"]{opacity:1;background:rgba(4,6,12,.5)}
-  .swatches{gap:12px}
-  .swatch{width:34px;height:34px;position:relative}
-  .swatch::after{content:"";position:absolute;inset:-6px}                 /* 46px tap area */
-  .seg button,.seg-solo{min-height:44px;padding:0 16px;font-size:12px}
-  .vol{height:44px}
-  .vol::-webkit-slider-thumb{width:22px;height:22px;margin-top:-10px}
-  .vol::-moz-range-thumb{width:22px;height:22px}
-  .keys.kb{display:none}
-  #hint{bottom:196px}
-  #caption{bottom:max(13vh,210px)}
-}
-@media (pointer:fine){.keys.touch{display:none}}
 #hint{position:fixed;left:50%;bottom:20px;translate:-50% 0;color:var(--ink-3);font-size:12px;white-space:nowrap;transition:opacity 2s;pointer-events:none}
 #hint.gone{opacity:0}
 .options{display:flex;gap:16px 34px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--ink-3);animation:fade 1.6s .65s var(--out) both}
@@ -116,6 +101,22 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
   .opt .seg-solo{justify-self:start}
   .swatches{gap:8px}}
 .keys.touch{margin:0;max-width:34ch;text-align:center;line-height:1.5}
+/* touch screens: these override the base rules above, so they come last */
+@media (pointer:coarse){
+  .hud-btn{background:rgba(4,6,12,.34);border:1px solid var(--line);opacity:.75}   /* phones: visible over bright water */
+  .hud-btn:active,#sound[aria-pressed="true"]{opacity:1;background:rgba(4,6,12,.5)}
+  .swatches{gap:12px}
+  .swatch{width:34px;height:34px;position:relative}
+  .swatch::after{content:"";position:absolute;inset:-6px}                 /* 46px tap area */
+  .seg button,.seg-solo{min-height:44px;padding:0 16px;font-size:12px}
+  .vol{height:44px}
+  .vol::-webkit-slider-thumb{width:22px;height:22px;margin-top:-10px}
+  .vol::-moz-range-thumb{width:22px;height:22px}
+  .keys.kb{display:none}
+  #hint{bottom:196px}
+  #caption{bottom:max(13vh,210px)}
+}
+@media (pointer:fine){.keys.touch{display:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -396,6 +397,17 @@ float waveH(vec2 p, int oct){
   }
   return h;
 }
+vec3 waveHG(vec2 p, int oct, float e){                                 // height + slope in one pass (was three passes of waveH)
+  vec3 h=vec3(0.); float a=.2, f=.16, ang=.4;
+  for(int i=0;i<22;i++){
+    if(i>=oct) break;
+    vec2 dir=vec2(sin(ang),cos(ang)), u=f*dir*e;
+    float x=dot(dir,p)*f+uTime*sqrt(9.81*f), w=a*exp(sin(x)-1.);
+    h+=vec3(w, w*cos(x)*f*dir*clamp(1.-u*u/40.,0.,1.));             // slope fades where the old step of e would have averaged it out
+    a*=.77; f*=1.23; ang+=2.39;
+  }
+  return h;
+}
 float shoreAmp(float D){ return mix(.35,1.,smoothstep(6.5,20.,D)); }
 `;
 
@@ -444,8 +456,8 @@ const ocean = new THREE.Mesh(radialGrid(), new THREE.ShaderMaterial({ uniforms:U
     vec2 p=vW.xz;
     float e=.03+dist*.004, amp=shoreAmp(vD);
     int oc=uLite>.5 ? int(mix(20.,7.,smoothstep(40.,700.,dist))) : 20;   // below High: fine ripples only up close
-    float h0=waveH(p,oc), hx=waveH(p+vec2(e,0.),oc), hz=waveH(p+vec2(0.,e),oc);
-    vec3 n=normalize(vec3(-(hx-h0)/e*amp, 1., -(hz-h0)/e*amp));
+    vec3 hg=waveHG(p,oc,e); float h0=hg.x;
+    vec3 n=normalize(vec3(-hg.y*amp, 1., -hg.z*amp));
     n=normalize(mix(n, vec3(0,1,0), smoothstep(300.,2500.,dist)*.6));
     vec3 R=reflect(-V,n); R.y=abs(R.y);
     float fr=.02+.98*pow(1.-max(dot(n,V),0.),5.);
@@ -944,6 +956,9 @@ for (const sx of [-1, 1]){
   mir.lookAt(0, 0, 0); mir.rotateY(sx*.25);
 }
 const dashLight = new THREE.PointLight(0xffffff, .05, 1, 2); dashLight.position.set(0, -.24, -.76); bikeG.add(dashLight);
+// fuel tank between the rider's arms: only in view on tall (portrait) screens, where the field of view opens up
+add(bikeG, new THREE.SphereGeometry(1, 48, 24), mat.paintFront, 0, -.66, -.42).scale.set(.21, .14, .32);
+add(bikeG, new THREE.CylinderGeometry(.045, .045, .012, 32), mat.aluBlk, 0, -.522, -.5);                        // filler cap
 bake(bikeG, [bars]); bake(bars);
 camera.add(bikeG);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, .35); scene.add(hemi);
@@ -1409,8 +1424,8 @@ function applyQuality(name){
   quality = QUALITY[name] ? name : 'high';
   const qq = QUALITY[quality];
   renderer.setPixelRatio(STILL ? 1 : Math.min(devicePixelRatio, qq.pr)); composer.setPixelRatio(renderer.getPixelRatio());
-  bloom.enabled = qq.bloom; U.uLite.value = qq.lite; lens.uniforms.uTaps.value = qq.taps;
-  for (const rt of [composer.renderTarget1, composer.renderTarget2]){ rt.samples = qq.msaa; rt.dispose(); }
+  bloom.enabled = qq.bloom; U.uLite.value = MOBILE ? 1 : qq.lite; lens.uniforms.uTaps.value = MOBILE ? Math.min(qq.taps, 4) : qq.taps;   // phones: no galaxy in reflections, fewer lens taps
+  for (const rt of [composer.renderTarget1, composer.renderTarget2]){ rt.samples = MOBILE ? Math.min(qq.msaa, 2) : qq.msaa; rt.dispose(); }
   resize();
   document.querySelectorAll('[data-q]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === quality)));
   store('quality', quality);
@@ -1427,8 +1442,9 @@ function frame(now){
   const cockpit = !photo;
   bikeG.visible = cockpit;
   camera.position.set(b.x, b.gy + 1.2, b.z);
-  if (photo){ camera.rotation.set(look.pitch, look.yaw, 0); camera.fov = look.fov; }   // photo: look around freely from the saddle
-  else { camera.rotation.set(b.pitch - .05, b.yaw, b.lean); camera.fov = 62 + b.v/VMAX*14; }
+  const fit = v => Math.min(90, Math.max(v, Math.atan(Math.tan(v*Math.PI/360)*1.15/camera.aspect)*360/Math.PI));   // tall screens: keep at least a 1.15:1 screen's side view, up to 90° tall
+  if (photo){ camera.rotation.set(look.pitch, look.yaw, 0); camera.fov = fit(look.fov); }   // photo: look around freely from the saddle
+  else { camera.rotation.set(b.pitch - .05, b.yaw, b.lean); camera.fov = fit(62 + b.v/VMAX*14); }
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
   bars.rotation.y = b.steer*.12;
