@@ -392,7 +392,7 @@ const ocean = new THREE.Mesh(radialGrid(), new THREE.ShaderMaterial({ uniforms:U
     vec3 V=cameraPosition-vW; float dist=length(V); V/=dist;
     vec2 p=vW.xz;
     float e=.03+dist*.004, amp=shoreAmp(vD);
-    int oc=int(mix(20.,7.,smoothstep(40.,700.,dist)));             // fine ripples only up close
+    int oc=uLite>.5 ? int(mix(20.,7.,smoothstep(40.,700.,dist))) : 20;   // below High: fine ripples only up close
     float h0=waveH(p,oc), hx=waveH(p+vec2(e,0.),oc), hz=waveH(p+vec2(0.,e),oc);
     vec3 n=normalize(vec3(-(hx-h0)/e*amp, 1., -(hz-h0)/e*amp));
     n=normalize(mix(n, vec3(0,1,0), smoothstep(300.,2500.,dist)*.6));
@@ -1501,8 +1501,8 @@ renderer.setAnimationLoop(now => {
   if (MOBILE && gap > 0 && gap < 10) return;                       // 120 Hz phones: every other frame (60 fps); 60/90 Hz run as is
   if (gap > 0 && gap < 100 && !STILL && (perf.ms += gap, ++perf.n === 60)){   // dynamic resolution, kept within 75-100% of the chosen setting so it never turns to mush
     const ms = perf.ms/60, cur = renderer.getPixelRatio(), max = Math.min(devicePixelRatio, QUALITY[quality].pr), next = clamp(ms > 19 ? cur*.9 : ms < 17.5 ? cur*1.1 : cur, max*.75, max);
-    if (Math.abs(next - cur) > .02){ renderer.setPixelRatio(next); composer.setPixelRatio(next); resize(); }
-    if (fpsEl) fpsEl.textContent = `${Math.round(1000/ms)} fps · cpu ${(perf.cpu/60).toFixed(1)} ms · ${next.toFixed(2)}x · ${quality}`;
+    if (MOBILE && Math.abs(next - cur) > .02){ renderer.setPixelRatio(next); composer.setPixelRatio(next); resize(); }   // phones only: desktops can run slow frames for reasons pixels can't fix (power saving, 50 Hz screens)
+    if (fpsEl) fpsEl.textContent = `${Math.round(1000/ms)} fps · cpu ${(perf.cpu/60).toFixed(1)} ms · ${renderer.getPixelRatio().toFixed(2)}x · ${quality}`;
     perf = { n:0, ms:0, cpu:0 };
   }
   const t0 = performance.now(); frame(now); perf.cpu += performance.now() - t0;
