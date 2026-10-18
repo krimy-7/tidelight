@@ -94,12 +94,6 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
 #dawn{position:fixed;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;transition:opacity 3s var(--out),filter 3s var(--out);background:radial-gradient(60% 50% at 50% 50%,rgba(0,0,0,.25),transparent)}
 #dawn h2{margin:0;font:300 italic clamp(64px,10vw,6rem)/1 "Cormorant Garamond",serif;text-shadow:0 4px 40px rgba(0,0,0,.4)}
 #dawn p{margin:14px 0 0;color:var(--ink-2);font-size:15px}
-@media (max-width:560px){.theme .desc{display:none}.theme .name{font-size:18px}.keys{gap:6px 14px}
-  .options{flex-direction:column;align-items:stretch;gap:12px;width:min(100%,330px)}
-  .opt{display:grid;grid-template-columns:74px 1fr;align-items:center;gap:12px}
-  .opt .vol{width:100%}
-  .opt .seg-solo{justify-self:start}
-  .swatches{gap:8px}}
 .keys.touch{margin:0;max-width:34ch;text-align:center;line-height:1.5}
 /* touch screens: these override the base rules above, so they come last */
 @media (pointer:coarse){
@@ -113,10 +107,25 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
   .vol::-webkit-slider-thumb{width:22px;height:22px;margin-top:-10px}
   .vol::-moz-range-thumb{width:22px;height:22px}
   .keys.kb{display:none}
-  #hint{bottom:196px}
-  #caption{bottom:max(13vh,210px)}
+  #hint,#caption{top:calc(max(14px,env(safe-area-inset-top)) + 64px);bottom:auto}   /* in the sky under the top buttons, clear of the dash and thumbs */
 }
 @media (pointer:fine){.keys.touch{display:none}}
+/* narrow screens: options become an aligned list that fits any width down to 320px; theme cards widen so their names never touch */
+@media (max-width:560px){
+  .theme .desc{display:none}
+  .themes{gap:12px}
+  .view{width:min(26vw,112px)}
+  .theme .name{font-size:16px}
+  .keys{gap:6px 14px}
+  .options{flex-direction:column;align-items:stretch;gap:12px;width:100%;max-width:330px}
+  .opt{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:12px}
+  .opt-label{letter-spacing:.14em}
+  .swatches{display:flex;gap:6px}
+  .swatch{flex:1 1 0;min-width:0;max-width:34px;height:auto;aspect-ratio:1}
+  .seg button{flex:1;padding:0 6px}
+  .opt .vol{width:100%}
+  .opt .seg-solo{justify-self:start}
+}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
