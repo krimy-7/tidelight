@@ -45,6 +45,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   background:rgba(238,243,255,.07);transition:background .5s,border-color .5s}
 #ride:hover{background:rgba(238,243,255,.15);border-color:rgba(238,243,255,.45)}
 .keys{display:flex;gap:8px 20px;flex-wrap:wrap;justify-content:center;color:var(--ink-3);font-size:12px}
+.credit{margin:6px 0 0;color:var(--ink-3);font-size:11px;letter-spacing:.18em;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.7)}
+.credit a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--line);transition:color .3s,border-color .3s}
+.credit a:hover,.credit a:focus-visible{color:var(--ink);border-color:var(--ink-2)}
 kbd{font:600 11px/1 Manrope;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;margin-right:3px;border-radius:6px;border:1px solid var(--line);color:var(--ink-2)}
 
 [hidden]{display:none!important}
@@ -160,6 +163,7 @@ body.photo #sound,body.photo #hint,body.photo #caption{display:none}
     <button id="ride">Start riding</button>
     <div class="keys kb"><span><kbd>↑</kbd><kbd>↓</kbd>speed</span><span><kbd>←</kbd><kbd>→</kbd>steer</span><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>theme</span><span><kbd>P</kbd>photo</span><span><kbd>M</kbd>sound</span><span><kbd>Esc</kbd>menu</span></div>
     <p class="keys touch">Left buttons steer, right buttons set your speed. Pause brings you back here.</p>
+    <p class="credit">Made by <a href="https://www.krishnanishad.com.np/" target="_blank" rel="noopener">Krishna</a></p>
   </div>
 </div>
 <button id="sound" class="hud-btn" aria-pressed="false" aria-label="Turn sound on"></button>
